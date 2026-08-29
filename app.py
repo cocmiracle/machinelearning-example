@@ -2,16 +2,17 @@ import streamlit as st
 from sentence_transformers import SentenceTransformer, util
 from PIL import Image
 import numpy as np
+import os
 
 # 1. Корпоративна конфигурация на интерфейса
 st.set_page_config(
-    page_title="Industrial QC Matrix", 
-    page_icon="🛡️", 
-    layout="wide", 
+    page_title="Industrial QC Matrix",
+    page_icon="🛡️",
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Луксозен дизайн с големи и бели букви
+# Луксозен дизайн с ОПТИМИЗИРАНИ ШРИФТОВЕ, ФИКСИРАН БУТОН И БЕЛИ БУКВИ ЗА ТЕХНИЧЕСКИТЕ СПЕЦИФИКАЦИИ В ПАНЕЛА
 st.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -127,11 +128,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. ЧИСТО ОБЛАЧНО ЗАРЕЖДАНЕ (Задължително за хостинг)
+# 2. Оптимизирано локално зареждане на ИИ ядрото
+
+
 @st.cache_resource
 def load_industrial_vision_core():
-    # Облакът сам сваля модела в RAM паметта си при първия старт
-    return SentenceTransformer('clip-ViT-B-32')
+    local_model_path = "./industrial_clip_core"
+    if not os.path.exists(local_model_path):
+        with st.spinner("📦 Първоначално конфигуриране на ИИ ядрото (Сваляне само веднъж)..."):
+            model = SentenceTransformer('clip-ViT-B-32')
+            model.save(local_model_path)
+            return model
+    else:
+        return SentenceTransformer(local_model_path)
+
 
 try:
     model = load_industrial_vision_core()
@@ -141,26 +151,32 @@ except Exception as e:
 
 # 3. Странично меню (Sidebar)
 with st.sidebar:
-    st.markdown("<h2 style='color:#58a6ff; margin-top:0;'>⚙️ QC Настройки</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#58a6ff; margin-top:0;'>⚙️ QC Настройки</h2>",
+                unsafe_allow_html=True)
     st.markdown("<p style='font-size:16px;'>Конфигуриране на сензорите и праговете на толеранс в реално време.</p>", unsafe_allow_html=True)
-    
-    tolerance_threshold = st.slider("Критичен праг на сигурност (%)", min_value=50, max_value=95, value=75, step=5)
-    
+
+    tolerance_threshold = st.slider(
+        "Критичен праг на сигурност (%)", min_value=50, max_value=95, value=75, step=5)
+
     st.write("---")
-    st.markdown("<b style='color:#8b949e; font-size:16px;'>Системна информация:</b>", unsafe_allow_html=True)
+    st.markdown("<b style='color:#8b949e; font-size:16px;'>Системна информация:</b>",
+                unsafe_allow_html=True)
     st.caption("Engine: OpenAI CLIP ViT-B-32")
-    st.caption("Hardware: Cloud CPU Instance")
-    st.caption("Mode: Automated Quality Control")
+    st.caption("Hardware: CPU Autonomous Thread")
+    st.caption("Mode: Production Automated Inspection")
 
 # 4. Основен екран / Дашборд
-st.markdown("<h1 style='color:#f0f6fc; margin-bottom: 0px;'>🛡️ MATRIX QUALITY CONTROL</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color:#f0f6fc; margin-bottom: 0px;'>🛡️ MATRIX QUALITY CONTROL</h1>",
+            unsafe_allow_html=True)
 st.markdown("<p style='color:#8b949e; font-size:18px; margin-top:5px; margin-bottom:30px;'>Автоматизиран визуален контрол и откриване на производствени дефекти.</p>", unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1, 1.2], gap="large")
 
 with col_left:
-    st.markdown("<h3 style='color:#58a6ff; margin-bottom:15px;'>📥 Входящ визуален поток</h3>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Качване на файл", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+    st.markdown("<h3 style='color:#58a6ff; margin-bottom:15px;'>📥 Входящ визуален поток</h3>",
+                unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Качване на файл", type=[
+                                     "jpg", "jpeg", "png"], label_visibility="collapsed")
 
     if uploaded_file is not None:
         st.write("")
@@ -168,31 +184,35 @@ with col_left:
         st.image(image, caption='Входяща матрица от камерата', width='stretch')
 
 with col_right:
-    st.markdown("<h3 style='color:#58a6ff; margin-bottom:15px;'>📊 Системен анализ на детайла</h3>", unsafe_allow_html=True)
-    
+    st.markdown("<h3 style='color:#58a6ff; margin-bottom:15px;'>📊 Системен анализ на детайла</h3>",
+                unsafe_allow_html=True)
+
     if uploaded_file is not None:
         with st.spinner("Математическа екстракция на сигнатура..."):
             image_embedding = model.encode(image, convert_to_tensor=True)
-        
+
         class_queries = [
             "a green or red apple with a stem and leaf, fresh round fruit",
             "a bunch of bananas, yellow or red banana, elongated fruit",
             "a round orange citrus fruit, texturized skin orange"
         ]
-        
+
         text_embeddings = model.encode(class_queries, convert_to_tensor=True)
         cos_scores = util.cos_sim(image_embedding, text_embeddings)
         scores = cos_scores.cpu().numpy()
-        
-        exp_scores = np.exp(scores * 50)  
-        probabilities = (exp_scores / np.sum(exp_scores))
-        
+
+        exp_scores = np.exp(scores * 50)
+        # СИСТЕМНА ПОПРАВКА: Извличаме първия ред веднага
+        probabilities = (exp_scores / np.sum(exp_scores))[0]
+
         top_class_idx = np.argmax(probabilities)
+        # Професионално конвертиране в float
         confidence = float(probabilities[top_class_idx] * 100)
-        
-        system_labels = ["Компонент А (Ябълка)", "Компонент B (Банан)", "Компонент C (Портокал)"]
+
+        system_labels = [
+            "Компонент А (Ябълка)", "Компонент B (Банан)", "Компонент C (Портокал)"]
         detected_label = system_labels[top_class_idx]
-        
+
         if confidence < tolerance_threshold:
             st.markdown(f"""
                 <div class='metric-card' style='border-left: 6px solid #f85149;'>
@@ -211,11 +231,13 @@ with col_right:
                     <div class='metric-value' style='color:#56d364;'>{confidence:.2f}%</div>
                 </div>
             """, unsafe_allow_html=True)
-            
+
         st.write("")
-        st.markdown("<b style='color:#f0f6fc; font-size:19px;'>Матрица на вероятностите:</b>", unsafe_allow_html=True)
+        st.markdown(
+            "<b style='color:#f0f6fc; font-size:19px;'>Матрица на вероятностите:</b>", unsafe_allow_html=True)
         for idx, label in enumerate(system_labels):
-            st.markdown(f"<div class='probability-text' style='margin-top:10px;'>{label} ({probabilities[idx]*100:.1f}%)</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='probability-text' style='margin-top:10px;'>{label} ({probabilities[idx]*100:.1f}%)</div>", unsafe_allow_html=True)
             st.progress(float(probabilities[idx]))
     else:
         st.markdown("""
